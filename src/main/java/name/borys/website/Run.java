@@ -18,10 +18,8 @@ package name.borys.website;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.FileInputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringWriter;
-import java.io.Writer;
 import java.util.Properties;
 
 import org.apache.commons.cli.CommandLine;
@@ -35,6 +33,7 @@ import org.apache.commons.lang3.CharEncoding;
 import org.apache.commons.lang3.StringUtils;
 
 import freemarker.template.Configuration;
+import freemarker.template.TemplateException;
 
 /**
  * Copies your source content structure to the destination,
@@ -76,17 +75,14 @@ public class Run {
         for (File ftl : FileUtils.listFiles(dstDir, new String[] {"ftl"}, false)) {
             String story = StringUtils.removeEnd(ftl.getName(), ".ftl");
 
-            Configuration cfg = new Configuration(Configuration.VERSION_2_3_22);
-            cfg.setDirectoryForTemplateLoading(dstDir);
-            cfg.setDefaultEncoding(CharEncoding.UTF_8);
-
             String htmlFileName = dstDir.getAbsolutePath() + "/" + story + ".html";
             Properties thisFileProps = loadIfExists(properties, new File(story + ".properties"));
             properties.setProperty("pathToStory", story);
 
-            Writer out = new FileWriter(htmlFileName);
-            cfg.getTemplate(story + ".ftl", CharEncoding.UTF_8).process(thisFileProps, out);
-            out.close();
+            FileUtils.writeStringToFile(
+                    new File(htmlFileName),
+                    applyTemplates(dstDir, thisFileProps,
+                            "templates/header.ftl", story + ".ftl", "templates/footer.ftl"), CharEncoding.UTF_8);
 
             new File(dstDir, story + ".ftl").delete();
             new File(dstDir, story + ".properties").delete();
@@ -106,10 +102,6 @@ public class Run {
 
     static String makeStory(File topicDir, String story, String topic) throws Exception {
 
-        Configuration cfg = new Configuration(Configuration.VERSION_2_3_22);
-        cfg.setDirectoryForTemplateLoading(topicDir);
-        cfg.setDefaultEncoding(CharEncoding.UTF_8);
-
         Properties properties = loadIfExists(
                 loadIfExists(null, new File(topicDir, "/templates/templates.properties")),
                 new File(topicDir, story + ".properties"));
@@ -119,21 +111,36 @@ public class Run {
 
         properties.setProperty("pathToStory", topic + "/" + story);
 
-        Writer out = new FileWriter(htmlFileName);
-        cfg.getTemplate(story + ".ftl", CharEncoding.UTF_8).process(properties, out);
-        out.close();
+        FileUtils.writeStringToFile(new File(htmlFileName),
+                applyTemplates(topicDir, properties, "templates/header.ftl", story + ".ftl", "templates/footer.ftl"),
+                CharEncoding.UTF_8);
 
         new File(topicDir, story + ".ftl").delete();
         new File(topicDir, story + ".properties").delete();
 
-        StringWriter stringWriter = new StringWriter();
-        cfg.getTemplate("templates/index.ftl", CharEncoding.UTF_8).process(properties, stringWriter);
-        index.append(stringWriter.toString());
+        index.append(applyTemplates(topicDir, properties, "templates/index.ftl"));
         return index.toString();
     }
 
+    static String applyTemplates(File templateDir, Properties model, String... templates) throws IOException, TemplateException {
+        Configuration cfg = new Configuration(Configuration.VERSION_2_3_22);
+        cfg.setDirectoryForTemplateLoading(templateDir);
+        cfg.setDefaultEncoding(CharEncoding.UTF_8);
+
+        StringWriter stringWriter = new StringWriter();
+        for (String template : templates) {
+            cfg.getTemplate(template, CharEncoding.UTF_8).process(model, stringWriter);
+        }
+        return stringWriter.toString();
+    }
+
     static Properties loadIfExists(Properties defaults, File file) throws IOException {
-        Properties properties = new Properties(defaults);
+        Properties properties = new Properties();
+        if (defaults != null) {
+            for (Object key : defaults.keySet()) {
+                properties.put(key, defaults.get(key));
+            }
+        }
         if (file.exists()) {
             properties.load(new AutoCloseInputStream(new FileInputStream(file)));
         }

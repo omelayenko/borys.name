@@ -1,4 +1,5 @@
 <!DOCTYPE html>
 <html>
-<title>${title}</title>
-<body>
+<title>Blog: ${title}</title>
+<body color="${color}">
+<h1>${description}</h1>

@@ -1,1 +1,1 @@
-<html></html>
+<ul>${topic_blog}</ul>

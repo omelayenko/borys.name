@@ -1,4 +1,4 @@
 <!DOCTYPE html>
 <html>
-<title>${title}</title>
+<title>${id}</title>
 <body>
