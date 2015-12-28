@@ -20,7 +20,11 @@ import java.io.FileFilter;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -31,6 +35,7 @@ import org.apache.commons.io.filefilter.DirectoryFileFilter;
 import org.apache.commons.io.input.AutoCloseInputStream;
 import org.apache.commons.lang3.CharEncoding;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 
 import freemarker.template.Configuration;
 import freemarker.template.TemplateException;
@@ -92,15 +97,16 @@ public class Run {
 
     static String makeTopic(File topicDir, String topic) throws Exception {
 
-        String index = "";
+        List<Pair<String, String>> index = new LinkedList<>();
         for (File ftl : FileUtils.listFiles(topicDir, new String[] {"ftl"}, false)) {
-            index += makeStory(ftl.getParentFile(), StringUtils.removeEnd(ftl.getName(), ".ftl"), topic);
+            index.add(makeStory(ftl.getParentFile(), StringUtils.removeEnd(ftl.getName(), ".ftl"), topic));
         }
         FileUtils.deleteDirectory(new File(topicDir, "templates"));
-        return index;
+        Collections.sort(index, (l, r) -> l.getKey().compareTo(r.getKey()));
+        return StringUtils.join(index.stream().map(pair -> pair.getValue()).collect(Collectors.toList()), "\n");
     }
 
-    static String makeStory(File topicDir, String story, String topic) throws Exception {
+    static Pair<String, String> makeStory(File topicDir, String story, String topic) throws Exception {
 
         Properties properties = loadIfExists(
                 loadIfExists(null, new File(topicDir, "/templates/templates.properties")),
@@ -118,8 +124,12 @@ public class Run {
         new File(topicDir, story + ".ftl").delete();
         new File(topicDir, story + ".properties").delete();
 
-        index.append(applyTemplates(topicDir, properties, "templates/index.ftl"));
-        return index.toString();
+        try {
+            index.append(applyTemplates(topicDir, properties, "templates/index.ftl"));
+        } catch (Exception e) {
+            throw new Exception("On topic " + topic + ", story " + story);
+        }
+        return Pair.of(properties.getProperty("order", "0"), index.toString());
     }
 
     static String applyTemplates(File templateDir, Properties model, String... templates) throws IOException, TemplateException {
